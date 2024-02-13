@@ -1,9 +1,9 @@
 import numpy as np  
 import casadi
 
-# select the formulation
-# formulation = 'mathematical'
-formulation = 'interpolant'
+# # select the formulation
+formulation = 'mathematical'
+# formulation = 'interpolant'
 
 # data
 AID = np.load('./dataDynamicCASADI.npz')
