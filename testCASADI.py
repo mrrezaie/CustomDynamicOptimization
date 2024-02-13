@@ -172,7 +172,7 @@ s_opts = {'max_iter':10000,
           'linear_solver':'mumps', 
           'tol':1e-6, 
           # 'hessian_approximation': 'limited-memory',
-          # 'nlp_scaling_method':'gradient-based',
+          'nlp_scaling_method':'gradient-based',
           }
           
 opti.solver('ipopt', p_opts, s_opts)
