@@ -2,8 +2,8 @@ import numpy as np
 import casadi
 
 # # select the formulation
-formulation = 'mathematical'
-# formulation = 'interpolant'
+# formulation = 'mathematical'
+formulation = 'interpolant'
 
 # data
 AID = np.load('./dataDynamicCASADI.npz')
@@ -46,6 +46,11 @@ y2 = AID['y2'].tolist()
 y3 = AID['y3'].tolist()
 y4 = AID['y4'].tolist()
 
+# examples:
+# https://github.com/MarcoPenne/AMR_MPC-CBF/blob/33862ab3c3163967543dcf26eb0e8d825755456f/continuos_time/CarModel.py#L27
+# https://github.com/YznMur/mown-project/blob/448dce8b1a66346cffb55d375c290b5f7bb4b23b/planning/move_controller/src/move_controller/move_nmpc.py#L176
+# https://github.com/MIT-REALM/density_planner/blob/2c3b6d9b7bb6e62546a866ada151d2ec61021a18/motion_planning/MotionPlannerNLP.py#L402
+
 AFLC = casadi.interpolant('AFLC', 'linear', [x1], y1) #, {"inline": True}
 AFVC = casadi.interpolant('AFVC', 'linear', [x2], y2)
 PFLC = casadi.interpolant('PFLC', 'linear', [x3], y3)
@@ -53,10 +58,11 @@ TFLC = casadi.interpolant('TFLC', 'linear', [x4], y4)
 
 # # the outputs of the interpolants are correct numerically
 # import matplotlib.pyplot as plt 
-# plt.plot(x1, AFLC(x1))
-# plt.plot(x2, AFVC(x2))
-# plt.plot(x3, PFLC(x3))
-# plt.plot(x4, TFLC(x4))
+# plt.plot(x1, AFLC(x1), label='AFLC')
+# plt.plot(x2, AFVC(x2), label='AFVC')
+# plt.plot(x3, PFLC(x3), label='PFLC')
+# plt.plot(x4, TFLC(x4), label='TFLC')
+# plt.legend()
 # plt.show(block=False)
 
 for i in range(iN):
@@ -66,16 +72,10 @@ for i in range(iN):
                       _MLAT[i,:]**2 + AID['height'][np.newaxis]**2 )
 
     # equality constraint on fiber length and velocity
-    if i == 0:     # second order forward difference
-        _NMLDot = ((-3*_NML[i,:]+4*_NML[i+1,:]-_NML[i+2,:])/2/iDt)
-    elif i == 1:    # first order forward difference
-        _NMLDot = ((_NML[i+1,:]-_NML[i,:])/1/iDt)
-    elif i == iN-2:  # first order backward difference
-        _NMLDot = ((_NML[i,:]-_NML[i-1,:])/1/iDt)
-    elif i == iN-1:  # second order backward difference
-        _NMLDot = ((3*_NML[i,:]-4*_NML[i-1,:]+_NML[i-2,:])/2/iDt)
-    else:           # central difference
-        _NMLDot = ((_NML[i+1,:]-_NML[i-1,:])/2/iDt)
+    if i == 0:
+        _NMLDot = 0
+    else: # backward euler method
+        _NMLDot = (_NML[i,:]-_NML[i-1,:])/iDt
 
     opti.subject_to( _NMLDot / AID['CVmax'][np.newaxis] == _NMV[i,:] )
 
@@ -136,21 +136,25 @@ for i in range(iN):
         # pagefile and memory are being increased too much (4~5 GB)
         ################################################################################
 
-        force = list()
-        for mi in range(iM):
-            NTF   = TFLC(NTL[mi])
-            NMFAT = ( _a[i,mi]*AFLC(_NML[i,mi])*AFVC(_NMV[i,mi]) + PFLC(_NML[i,mi]) ) * PAcos[mi]
-            opti.subject_to(NTF == NMFAT)
-            force.append(NMFAT)
+        # force = list()
+        # for mi in range(iM):
+        #     NTF   = TFLC(NTL[mi])
+        #     NMFAT = ( _a[i,mi]*AFLC(_NML[i,mi])*AFVC(_NMV[i,mi]) + PFLC(_NML[i,mi]) ) * PAcos[mi]
+        #     opti.subject_to(NTF == NMFAT)
+        #     force.append(NMFAT)
+        # # convert force list to casadi MX
+        # force2 = casadi.horzcat(*force)
 
-        # convert force list to casadi MX
-        force2 = casadi.horzcat(*force)
+        NTF   = TFLC(NTL)
+        NMFAT = ( _a[i,:]*AFLC(_NML[i,:])*AFVC(_NMV[i,:]) + PFLC(_NML[i,:]) ) * PAcos
+        opti.subject_to(NTF == NMFAT)
 
         for ci,cName in enumerate(AID['include']):
             _tau       = AID['tau'][i,ci] # float
             _momentArm = AID[cName][i,:] # array
             # _moment    = sum( _momentArm[mi] * force[mi] * AID['IFmax'][mi] for mi in range(iM)) # float
-            _moment    = casadi.sum2( _momentArm[np.newaxis] * force2 * AID['IFmax'][np.newaxis]) # float
+            # _moment    = casadi.sum2( _momentArm[np.newaxis] * force2 * AID['IFmax'][np.newaxis]) # float
+            _moment    = casadi.sum2( _momentArm[np.newaxis] * NMFAT * AID['IFmax'][np.newaxis]) # float
             opti.subject_to( _moment == _tau )
 
     else:
@@ -160,7 +164,8 @@ for i in range(iN):
 # objective function
 activitation = casadi.sumsqr(_a)
 fiberVelNorm = 0.1*casadi.sumsqr(_NMV)
-opti.minimize( activitation + fiberVelNorm)
+# opti.minimize( activitation + fiberVelNorm)
+opti.minimize( activitation)
 
 # plugin_options
 p_opts = {'expand':False, 
@@ -178,3 +183,20 @@ s_opts = {'max_iter':10000,
 opti.solver('ipopt', p_opts, s_opts)
 
 solver = opti.solve()
+
+# %%
+
+# examples
+import casadi 
+
+opti = casadi.Opti()
+
+x = opti.variable()
+y = opti.variable()
+
+opti.minimize((1-x)**2+(y-x**2)**2)
+
+opti.solver('ipopt')
+sol = opti.solve()
+
+print(sol.value(x),sol.value(y))
