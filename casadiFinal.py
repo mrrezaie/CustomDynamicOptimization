@@ -65,7 +65,7 @@ def calcShift(kt):
 
 
 # data
-AID = dict( np.load('./dataDynamicCASADI.npz') )
+AID = dict( np.load('./dataDynamic.npz') )
 
 # adjust tendon stiffness (DeGroote muscle)
 stiffness, shift = list(),list()
