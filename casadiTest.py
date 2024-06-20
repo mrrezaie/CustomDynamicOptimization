@@ -6,7 +6,7 @@ import casadi
 formulation = 'interpolant'
 
 # data
-AID = np.load('./dataDynamic.npz')
+AID = np.load('./dataTest.npz')
 
 # parameters
 iN  = 73 # time frames

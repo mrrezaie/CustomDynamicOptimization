@@ -1,4 +1,4 @@
-from pyomo.common.timing import report_timing
+# from pyomo.common.timing import report_timing
 # report_timing()
 
 import pyomo.environ as pyo
@@ -70,7 +70,7 @@ def ActivationDynamicsPyomo(e,a, tact=0.015, tdeact=0.06, b=0.1):
 
 
 # data
-AID = dict(np.load('./dataDynamic.npz'))
+AID = dict(np.load('./dataTest.npz'))
 
 # adjust tendon stiffness (DeGroote muscle)
 stiffness, shift = list(),list()
